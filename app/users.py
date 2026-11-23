@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .config import Settings
 
-MODES = ("smart", "designated", "direct115", "redirect302")
+MODES = ("smart", "designated", "direct115", "direct123", "directguangya", "redirect302")
 
 
 @dataclass

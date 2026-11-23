@@ -3,8 +3,12 @@
 A source is one backend behind the same Emby library:
   clouddrive2 - CD2 mount, e.g. /CloudNAS
   115         - 115 cloud drive, via its direct-link / 302 entry
+  123         - 123 cloud drive, via its open-platform direct link
+  guangya     - 光鸭 cloud drive (gy), via its temporary direct link
   local       - local disk
   remote      - a remote Emby / WebDAV / HTTP entry
+
+auth_token is optional and lives only in data/sources.json, never in git.
 
 Stored in data/sources.json. The first source is seeded from
 Settings.source_root as a clouddrive2 source.
@@ -23,11 +27,12 @@ from .config import Settings
 class Source:
     id: str
     name: str
-    type: str  # clouddrive2 | 115 | local | remote
+    type: str  # clouddrive2 | 115 | 123 | guangya | local | remote
     root: str = ""
     base_url: str = ""
     weight: int = 100
     enabled: bool = True
+    auth_token: str = ""
 
 
 def _path(settings: Settings) -> Path:
@@ -62,9 +67,9 @@ def save_sources(settings: Settings, sources: list[Source]) -> None:
     )
 
 
-def add_source(settings: Settings, name: str, type_: str, root: str = "", base_url: str = "", weight: int = 100) -> Source:
+def add_source(settings: Settings, name: str, type_: str, root: str = "", base_url: str = "", weight: int = 100, auth_token: str = "") -> Source:
     sources = load_sources(settings)
-    src = Source(id=uuid.uuid4().hex[:8], name=name, type=type_, root=root, base_url=base_url.rstrip("/"), weight=weight)
+    src = Source(id=uuid.uuid4().hex[:8], name=name, type=type_, root=root, base_url=base_url.rstrip("/"), weight=weight, auth_token=auth_token)
     sources.append(src)
     save_sources(settings, sources)
     return src

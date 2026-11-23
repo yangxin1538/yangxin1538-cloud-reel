@@ -23,7 +23,14 @@ CloudDrive2 挂载的网盘 (/CloudNAS)
 
 灵感来自 [wiki.nextemby.com](https://wiki.nextemby.com)，按 CloudReel 的单端口思路重新实现，不含原项目代码：
 
-- **多源注册（NextEmby 服务器配置）**：`GET/POST /api/sources`，源类型有 `clouddrive2`、`115`、`local`、`remote`，带权重和启用开关，默认源就是 CD2 的 `/CloudNAS`。
+- **多源注册（NextEmby 服务器配置）**：`GET/POST /api/sources`，源类型有 `clouddrive2`、`115`、`123`、`guangya`（光鸭）、`local`、`remote`，带权重和启用开关，默认源就是 CD2 的 `/CloudNAS`。
+
+### v0.3：123 网盘 + 光鸭云盘
+
+- **123 网盘**：源类型 `123`，分流模式 `direct123`。123 有开放平台，流程是 `RequestAccessToken(client_id, client_secret)` → `EnableDirectLink(fileId)` → `GetDirectLinkUrl(fileId)`。大文件（>100MB）通常要登录后的 Authorization，否则会报 5112 / 请登录后下载。CloudReel 里配 `base_url`（直链入口）和 `auth_token` 就能走 302，没配就走 CD2 / 本地挂载读文件。
+- **光鸭云盘**：源类型 `guangya`（标识 `gy`，迅雷旗下），分流模式 `directguangya`。光鸭面向第三方应用开放直连，单文件直链是临时链接，需要登录后捕获的 Bearer Authorization，直链有时效。CloudReel 不编造官方接口，没配 `base_url` 时会明确报错，配了就走 302，没配就走 CD2 / 本地挂载。
+- **分享链接识别**：`app/drives.py` 能识别 123 分享域名（`yun.123pan.com` / `www.123pan.com` / `*.share.123pan.cn`）。
+- **安全**：`auth_token` 只存在本机的 `data/sources.json` 里，不进 git，列表接口会打码显示。
 - **分流网关（NextEmby）**：四种模式 `smart` 智能分流、`designated` 指定网盘、`direct115` 115 直连、`redirect302` 302 跳转。`POST /api/resolve` 试算，`GET /play?path=...&user=...` 按用户模式分流，直链 302，本地文件直接 serving。
 - **Emby 反向代理**：`GET /emby/*` 透传到 `EMBY_UPSTREAM`（如 `http://127.0.0.1:8096`）。CloudReel 只用 8088 一个端口，不像 NextEmby 那样占 8091/8097/8098 三个端口。
 - **直链缓存**：解析结果按 `CACHE_TTL_SECONDS`（默认 3600 秒）缓存，`GET /api/cache` 查看，`POST /api/cache/clear` 清空。
@@ -117,6 +124,7 @@ SOURCE_ROOT=/tmp/cd2-demo STRM_ROOT=/tmp/strm-demo PORT=8088 \
 │   ├── parser.py     # 文件名解析：电影 / 剧集
 │   ├── scanner.py    # 扫描、生成、清理
 │   ├── sources.py    # 多源注册
+│   ├── drives.py     # 123 / 光鸭直链
 │   ├── diversion.py  # 分流模式解析
 │   ├── cache.py      # 直链缓存
 │   ├── users.py      # 用户管理

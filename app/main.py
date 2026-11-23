@@ -31,7 +31,7 @@ from . import users as users_mod
 from .config import Settings, load_settings, save_settings
 from .scanner import ScanResult, scan
 
-app = FastAPI(title="CloudReel", version="0.2.0")
+app = FastAPI(title="CloudReel", version="0.3.0")
 settings: Settings = load_settings()
 _last_scan: dict = {"status": "never", "result": None, "at": None}
 _scan_lock = threading.Lock()
@@ -53,6 +53,7 @@ class SourceIn(BaseModel):
     root: str = ""
     base_url: str = ""
     weight: int = 100
+    auth_token: str = ""
 
 
 class UserIn(BaseModel):
@@ -104,7 +105,7 @@ def _user_mode(user_name: str | None, mode: str | None, source_id: str | None):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.2.0"}
+    return {"ok": True, "version": "0.3.0"}
 
 
 @app.get("/")
@@ -163,13 +164,20 @@ def status():
 # --- Sources ---
 @app.get("/api/sources")
 def list_sources():
-    return [s.__dict__ for s in sources_mod.load_sources(settings)]
+    out = []
+    for s in sources_mod.load_sources(settings):
+        d = s.__dict__.copy()
+        d["auth_token"] = "***" if d.get("auth_token") else ""
+        out.append(d)
+    return out
 
 
 @app.post("/api/sources")
 def create_source(body: SourceIn):
-    src = sources_mod.add_source(settings, body.name, body.type, body.root, body.base_url, body.weight)
-    return src.__dict__
+    src = sources_mod.add_source(settings, body.name, body.type, body.root, body.base_url, body.weight, body.auth_token)
+    out = src.__dict__.copy()
+    out["auth_token"] = "***" if out.get("auth_token") else ""
+    return out
 
 
 @app.delete("/api/sources/{source_id}")

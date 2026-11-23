@@ -4,6 +4,8 @@ Modes (same names as NextEmby's user settings):
   smart       - highest-weight enabled source that contains the file
   designated  - the user's fixed source_id, nothing else
   direct115   - only a 115 source; fails otherwise
+  direct123   - only a 123 source; fails otherwise
+  directguangya - only a 光鸭 source; fails otherwise
   redirect302 - return the STRM's own URL, or a /play URL that 302s
 
 Resolution returns a target string. A target starting with '/' and
@@ -14,7 +16,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .drives import build_direct_url
 from .sources import Source
+
+DIRECT_MODES = {"direct115": "115", "direct123": "123", "directguangya": "guangya"}
 
 
 def _source_for_path(sources: list[Source], path: str) -> Source | None:
@@ -32,8 +37,10 @@ def resolve(strm_content: str, sources: list[Source], mode: str = "smart", sourc
 
     # A URL in the STRM is already a direct / 302 link.
     if content.startswith("http://") or content.startswith("https://"):
-        if mode == "direct115" and "115" not in content:
-            return {"ok": False, "error": "direct115 mode requires a 115 link"}
+        if mode in DIRECT_MODES:
+            want = DIRECT_MODES[mode]
+            if want not in content and want != "guangya":
+                return {"ok": False, "error": f"{mode} mode requires a {want} link"}
         return {"ok": True, "mode": mode, "source": None, "target": content, "via": "302"}
 
     # File path: map it to a source.
@@ -42,10 +49,15 @@ def resolve(strm_content: str, sources: list[Source], mode: str = "smart", sourc
         source = next((s for s in sources if s.id == source_id and s.enabled), None)
         if source is None:
             return {"ok": False, "error": f"designated source not found: {source_id}"}
-    elif mode == "direct115":
-        source = next((s for s in sources if s.type == "115" and s.enabled), None)
+    elif mode in DIRECT_MODES:
+        want = DIRECT_MODES[mode]
+        source = next((s for s in sources if s.type == want and s.enabled), None)
         if source is None:
-            return {"ok": False, "error": "no enabled 115 source"}
+            return {"ok": False, "error": f"no enabled {want} source"}
+        if source.type in ("123", "guangya") and not source.base_url and not source.root:
+            from .drives import build_direct_url as _bdu
+            err = _bdu(source.type, "", "", content)
+            return {"ok": False, "error": err["error"]}
     else:  # smart / redirect302
         source = _source_for_path(sources, content)
         if source is None:
