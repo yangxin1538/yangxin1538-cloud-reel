@@ -15,6 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 COPY app ./app
 COPY web ./web
+COPY plugins ./plugins
 
 EXPOSE 8088
 CMD ["python", "-m", "app.main"]
