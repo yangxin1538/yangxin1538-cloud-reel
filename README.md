@@ -19,6 +19,11 @@ CloudDrive2 挂载的网盘 (/CloudNAS)
 
 ## 功能
 
+### v0.3.2：通用部署
+
+- **所有 NAS 和云服务器**：不再只认群晖。通用 `docker-compose.yml` 用变量配路径，默认相对路径，在群晖、QNAP、绿联、TrueNAS、Unraid、Linux 云服务器上都能跑；`deploy/docker-run.sh` 提供 `docker run` 装法；完整对照见 `docs/DEPLOY.md`。`docker-compose.synology.yml` 保留，只是群晖示例。
+- **网络**：默认桥接 `8088:8088`，host 模式改成可选项（CD2 挂载需要 `rslave` 传播时再用）。
+
 ### v0.2：NextEmby + NextFind 集成
 
 灵感来自 [wiki.nextemby.com](https://wiki.nextemby.com)，按 CloudReel 的单端口思路重新实现，不含原项目代码：
@@ -60,29 +65,32 @@ CloudDrive2 挂载的网盘 (/CloudNAS)
 - Web 管理端：改配置、手动触发扫描、看状态和日志
 - 定时扫描：按 `SCAN_INTERVAL_MINUTES` 自动跑
 
-## 快速开始（群晖 / Synology）
+## 快速开始（所有 NAS 和云服务器）
 
-前提：CloudDrive2 已在群晖上把网盘挂到 `/volume1/docker/clouddrive2/CloudNAS`，
-Emby 已装好。
+完整部署见 [docs/DEPLOY.md](docs/DEPLOY.md)。不认某个牌子的 NAS：群晖、QNAP、绿联、TrueNAS、Unraid、Linux 云服务器都能装，`docker run` 和 `docker compose` 两种装法都支持。
 
-1. 在群晖上创建目录：
-   - `/volume1/docker/cloud-reel/data`
-   - `/volume1/docker/cloud-reel/config`
-   - `/volume2/存储盘2/strm/media/CloudReel`
-
-2. 用 `docker-compose.synology.yml` 部署（见该文件，路径按你的实际盘符改）：
+**Docker Compose（推荐）：**
 
 ```bash
-docker compose -f docker-compose.synology.yml up -d
+git clone https://github.com/yangxin1538/yangxin1538-cloud-reel.git
+cd yangxin1538-cloud-reel
+cp .env.example .env   # 改里面的路径和 123 凭证
+docker compose up -d
 ```
 
-3. 打开 `http://群晖IP:8088`，确认源目录是 `/CloudNAS`、输出目录是 `/strm/CloudReel`，点「立即扫描」。
+**Docker Run：**
 
-4. 在 Emby 里新建媒体库，类型选电影 / 电视剧，路径指向：
-   - `/volume2/存储盘2/strm/media/CloudReel/Movies`
-   - `/volume2/存储盘2/strm/media/CloudReel/TV`
+```bash
+DATA_DIR=/data/cloud-reel/data STRM_DIR=/data/strm \
+  CLOUDNAS_DIR=/mnt/CloudNAS sh deploy/docker-run.sh
+# 云服务器没有本地挂载：CLOUDNAS_DIR="" sh deploy/docker-run.sh
+```
 
-   Emby 容器也要能读到这个路径；如果 Emby 和 CloudReel 在同一台群晖上，用同样的宿主机路径挂载即可。
+打开 `http://<主机>:8088`，确认源目录是 `/CloudNAS`、输出目录是 `/strm/CloudReel`，点「立即扫描」。
+
+在 Emby 里新建媒体库，类型选电影 / 电视剧，路径指向 STRM 输出目录下的 `Movies` 和 `TV`。Emby 容器也要能读到这个路径；如果 Emby 和 CloudReel 在同一台机器上，用同样的宿主机路径挂载即可。
+
+群晖示例在 `docker-compose.synology.yml`，只是众多例子中的一个，不是唯一支持的平台。
 
 ## 本地开发
 
@@ -115,7 +123,9 @@ SOURCE_ROOT=/tmp/cd2-demo STRM_ROOT=/tmp/strm-demo PORT=8088 \
 | `SCAN_INTERVAL_MINUTES` | `60` | 定时扫描间隔，`0` 表示关闭 |
 | `DATA_DIR` | `/app/data` | 状态文件目录 |
 | `CONFIG_DIR` | `/app/config` | 配置文件目录 |
-| `PUID` / `PGID` | `0` | 仅 Docker 入口使用，用于改输出目录属主 |
+| `PUID` / `PGID` | `1000` | 仅 Docker 入口使用，用于改输出目录属主 |
+| `DATA_DIR` / `CONFIG_DIR` / `STRM_DIR` / `CLOUDNAS_DIR` | `./data` 等 | compose / docker run 时的主机路径变量，见 `docs/DEPLOY.md` |
+| `PAN123_CLIENT_ID` / `PAN123_CLIENT_SECRET` | `` | 123 真 API 凭证，不填则回落到 `base_url` / 文件 |
 
 支持的视频扩展名：`.mkv .mp4 .avi .mov .wmv .flv .ts .m2ts .webm .rmvb`，
 忽略 `sample`、`trailer` 等样片文件。
@@ -146,13 +156,15 @@ SOURCE_ROOT=/tmp/cd2-demo STRM_ROOT=/tmp/strm-demo PORT=8088 \
 ├── tests/
 │   └── test_parser.py
 ├── Dockerfile
-├── docker-compose.yml
-├── docker-compose.synology.yml
+├── docker-compose.yml          # 通用：所有 NAS / 云服务器
+├── docker-compose.synology.yml # 群晖示例
+├── deploy/docker-run.sh        # docker run 装法
+├── docs/DEPLOY.md              # 各平台部署对照
 └── requirements.txt
 ```
 
 ## 安全提醒
 
-- 默认用 `network_mode: host` + root 运行，和你原来 MoviDock 的部署一致，方便写文件，但不要把它暴露到公网。
+- 默认用桥接网络 + `PUID`/`PGID`（默认 1000）运行，不要把它暴露到公网；host 模式只在需要时再开。
 - `STRM_BASE_URL` 不要填带账号密码的直链。
-- 升级前备份 `/volume1/docker/cloud-reel/data` 和 `config`。
+- 升级前备份 `data` 和 `config` 目录。

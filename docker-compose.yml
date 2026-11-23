@@ -1,21 +1,54 @@
+# CloudReel - generic deployment: any NAS or cloud server.
+# Works on Synology / QNAP / UGREEN / TrueNAS / Unraid / Linux VPS,
+# anywhere Docker + Docker Compose runs. No Synology-only paths here.
+#
+# Quick start:
+#   cp .env.example .env   # then edit the paths / 123 credentials
+#   docker compose up -d
+#   open http://<host>:8088
+#
+# All host paths are variables with portable defaults (relative paths).
+# Set them in .env or in the shell; do not hard-code a NAS path here.
+#   DATA_DIR=./data            CONFIG_DIR=./config
+#   STRM_DIR=./strm            CLOUDNAS_DIR=./CloudNAS
+#   PORT=8088                  PUID=1000  PGID=1000
+#   PAN123_CLIENT_ID=          PAN123_CLIENT_SECRET=
+#
+# No local mount? On a cloud server, leave CLOUDNAS_DIR empty/unset
+# and remove that volume line, or point it at any local media folder.
+# 123 / Guangya direct links need no mount at all.
+#
+# Networking: bridge mode by default (port mapping). If your NAS
+# needs the CD2 mount to propagate (rslave) or Emby on the same host
+# to see the same paths, switch to host mode instead:
+#   uncomment `network_mode: host` below and delete the `ports:` block.
 services:
   cloud-reel:
     build: .
     image: cloud-reel:latest
     container_name: cloud-reel
     restart: unless-stopped
-    network_mode: host
+    # network_mode: host
+    ports:
+      - "${PORT:-8088}:8088"
     environment:
       PORT: "8088"
-      PUID: "0"
-      PGID: "0"
-      SOURCE_ROOT: "/CloudNAS"
+      PUID: "${PUID:-1000}"
+      PGID: "${PGID:-1000}"
+      SOURCE_ROOT: "${SOURCE_ROOT:-/CloudNAS}"
       STRM_ROOT: "/strm/CloudReel"
-      STRM_MODE: "file"
-      SCAN_INTERVAL_MINUTES: "60"
+      STRM_MODE: "${STRM_MODE:-file}"
+      STRM_BASE_URL: "${STRM_BASE_URL:-}"
+      SCAN_INTERVAL_MINUTES: "${SCAN_INTERVAL_MINUTES:-60}"
+      EMBY_UPSTREAM: "${EMBY_UPSTREAM:-}"
+      CACHE_TTL_SECONDS: "${CACHE_TTL_SECONDS:-3600}"
+      PAN123_CLIENT_ID: "${PAN123_CLIENT_ID:-}"
+      PAN123_CLIENT_SECRET: "${PAN123_CLIENT_SECRET:-}"
     volumes:
-      - "./data:/app/data"
-      - "./config:/app/config"
-      - "./strm:/strm:ro"
-      - "./strm/CloudReel:/strm/CloudReel"
-      - "./CloudNAS:/CloudNAS:ro,rslave"
+      - "${DATA_DIR:-./data}:/app/data"
+      - "${CONFIG_DIR:-./config}:/app/config"
+      - "${STRM_DIR:-./strm}:/strm"
+      - "${CLOUDNAS_DIR:-./CloudNAS}:/CloudNAS:ro"
+    # If CLOUDNAS_DIR is a CloudDrive2 mount, use rslave propagation:
+    # replace the last line above with:
+    #   - "${CLOUDNAS_DIR:-./CloudNAS}:/CloudNAS:ro,rslave"

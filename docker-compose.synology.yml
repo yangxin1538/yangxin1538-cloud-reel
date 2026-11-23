@@ -1,4 +1,7 @@
-# 群晖部署示例：按你的实际盘符改路径
+# Synology example ONLY - one of many. See docs/DEPLOY.md for
+# QNAP / UGREEN / TrueNAS / Unraid / Linux VPS and docker run.
+# The generic docker-compose.yml works on all of them; this file
+# just fills in Synology paths. 按你的实际盘符改路径。
 # CloudDrive2 已把网盘挂到 /volume1/docker/clouddrive2/CloudNAS
 # STRM 输出在 /volume2/存储盘2/strm/media/CloudReel
 services:
