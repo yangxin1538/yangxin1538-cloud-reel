@@ -17,6 +17,8 @@ class Settings:
     scan_interval_minutes: int = 60
     data_dir: Path = Path("/app/data")
     config_dir: Path = Path("/app/config")
+    emby_upstream: str = ""
+    cache_ttl_seconds: int = 3600
 
     @property
     def state_path(self) -> Path:
@@ -45,6 +47,10 @@ def _from_env() -> dict:
         out["data_dir"] = Path(os.environ["DATA_DIR"])
     if os.getenv("CONFIG_DIR"):
         out["config_dir"] = Path(os.environ["CONFIG_DIR"])
+    if os.getenv("EMBY_UPSTREAM") is not None:
+        out["emby_upstream"] = os.environ["EMBY_UPSTREAM"].strip().rstrip("/")
+    if os.getenv("CACHE_TTL_SECONDS"):
+        out["cache_ttl_seconds"] = int(os.environ["CACHE_TTL_SECONDS"])
     return out
 
 
@@ -64,9 +70,11 @@ def load_settings() -> Settings:
             for key in ("source_root", "strm_root", "data_dir", "config_dir"):
                 if key in raw:
                     setattr(settings, key, Path(raw[key]))
-            for key in ("strm_mode", "strm_base_url"):
+            for key in ("strm_mode", "strm_base_url", "emby_upstream"):
                 if key in raw:
                     setattr(settings, key, str(raw[key]).strip())
+            if "cache_ttl_seconds" in raw:
+                settings.cache_ttl_seconds = int(raw["cache_ttl_seconds"])
         except Exception:
             pass
     # 2. environment variables win
@@ -88,6 +96,8 @@ def save_settings(settings: Settings) -> None:
         "scan_interval_minutes": settings.scan_interval_minutes,
         "data_dir": str(settings.data_dir),
         "config_dir": str(settings.config_dir),
+        "emby_upstream": settings.emby_upstream,
+        "cache_ttl_seconds": settings.cache_ttl_seconds,
     }
     settings.config_path.write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"

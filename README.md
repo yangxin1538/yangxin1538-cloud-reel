@@ -19,6 +19,21 @@ CloudDrive2 挂载的网盘 (/CloudNAS)
 
 ## 功能
 
+### v0.2：NextEmby + NextFind 集成
+
+灵感来自 [wiki.nextemby.com](https://wiki.nextemby.com)，按 CloudReel 的单端口思路重新实现，不含原项目代码：
+
+- **多源注册（NextEmby 服务器配置）**：`GET/POST /api/sources`，源类型有 `clouddrive2`、`115`、`local`、`remote`，带权重和启用开关，默认源就是 CD2 的 `/CloudNAS`。
+- **分流网关（NextEmby）**：四种模式 `smart` 智能分流、`designated` 指定网盘、`direct115` 115 直连、`redirect302` 302 跳转。`POST /api/resolve` 试算，`GET /play?path=...&user=...` 按用户模式分流，直链 302，本地文件直接 serving。
+- **Emby 反向代理**：`GET /emby/*` 透传到 `EMBY_UPSTREAM`（如 `http://127.0.0.1:8096`）。CloudReel 只用 8088 一个端口，不像 NextEmby 那样占 8091/8097/8098 三个端口。
+- **直链缓存**：解析结果按 `CACHE_TTL_SECONDS`（默认 3600 秒）缓存，`GET /api/cache` 查看，`POST /api/cache/clear` 清空。
+- **用户管理**：`GET/POST /api/users`，绑定 Emby 用户、按用户定分流模式和指定源，默认有 `admin` 用户。
+- **播放与操作日志**：`GET /api/logs`，记录扫描、播放、分流失败，最多保留 500 条。
+- **发现与缺集诊断（NextFind）**：`POST /api/discovery/ingest` 粘贴频道 / 分享链接文本导入，`POST /api/discovery/diagnose` 对比 STRM 库报缺集，只用路径模式 STRM，和 NextFind v3.7.7 的做法一致。Telegram 频道自动订阅需要 Bot Token，本版先做手动导入，接口留好了。
+- **插件系统**：`plugins/*.py` 里放 `PLUGIN` 字典和 `run()`，`GET /api/plugins` 列出，`POST /api/plugins/{name}/run` 运行。已带一个 `pansou` 示例插件（未接真实接口，不会返回假链接）。
+
+### v0.1
+
 - 扫描 CD2 挂载目录，支持电影和剧集
 - 文件名解析：`电影名 (2024).mkv`、`剧名.S01E01.mkv` 等
 - 生成规范目录结构：
@@ -97,11 +112,21 @@ SOURCE_ROOT=/tmp/cd2-demo STRM_ROOT=/tmp/strm-demo PORT=8088 \
 ```
 .
 ├── app/
-│   ├── main.py       # FastAPI 入口、Web API、定时扫描
+│   ├── main.py       # FastAPI 入口、Web API、定时扫描、分流/网关/发现
 │   ├── config.py     # 配置加载（环境变量 + config.json）
 │   ├── parser.py     # 文件名解析：电影 / 剧集
 │   ├── scanner.py    # 扫描、生成、清理
+│   ├── sources.py    # 多源注册
+│   ├── diversion.py  # 分流模式解析
+│   ├── cache.py      # 直链缓存
+│   ├── users.py      # 用户管理
+│   ├── logs.py       # 操作/播放日志
+│   ├── discovery.py  # 发现导入与缺集诊断
+│   ├── gateway.py    # Emby 反向代理
+│   ├── plugins.py    # 插件加载
 │   └── __init__.py
+├── plugins/
+│   └── pansou.py     # 示例插件
 ├── web/
 │   └── index.html    # 管理端页面
 ├── tests/

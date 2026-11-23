@@ -56,7 +56,9 @@ def is_video(path: Path) -> bool:
 
 
 def parse_filename(name: str) -> Parsed:
-    stem = Path(name).stem
+    # Only strip a real video extension; "三体.S01E02" has no extension
+    # and Path().stem would eat the episode marker.
+    stem = Path(name).stem if Path(name).suffix.lower() in VIDEO_EXTS else name.strip()
     ep = EP_RE.search(stem)
     year_match = YEAR_RE.search(stem)
     year = year_match.group(1) if year_match else None

@@ -1,4 +1,14 @@
-"""CloudReel web service: config, manual scan, status, scheduled scan."""
+"""CloudReel v0.2 web service.
+
+v0.1: scan CD2, generate STRM, clean up, Web config, scheduled scan.
+v0.2, NextEmby + NextFind integration:
+  - Source registry + diversion modes (smart / designated / direct115 / redirect302)
+  - /play 302 / file serving, direct-link cache, playback logs
+  - User management (bind Emby user, per-user diversion mode)
+  - Emby reverse-proxy gateway at /emby/*
+  - Discovery ingest + missing-episode diagnosis
+  - Plugin system (plugins/*.py)
+"""
 from __future__ import annotations
 
 import asyncio
@@ -6,17 +16,26 @@ import threading
 import time
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
+from . import cache as cache_mod
+from . import discovery as discovery_mod
+from . import diversion as diversion_mod
+from . import gateway as gateway_mod
+from . import logs as logs_mod
+from . import plugins as plugins_mod
+from . import sources as sources_mod
+from . import users as users_mod
 from .config import Settings, load_settings, save_settings
 from .scanner import ScanResult, scan
 
-app = FastAPI(title="CloudReel", version="0.1.0")
+app = FastAPI(title="CloudReel", version="0.2.0")
 settings: Settings = load_settings()
 _last_scan: dict = {"status": "never", "result": None, "at": None}
 _scan_lock = threading.Lock()
+PLUGINS_DIR = Path(__file__).resolve().parent.parent / "plugins"
 
 
 class ConfigIn(BaseModel):
@@ -25,6 +44,40 @@ class ConfigIn(BaseModel):
     strm_mode: str | None = None
     strm_base_url: str | None = None
     scan_interval_minutes: int | None = None
+    emby_upstream: str | None = None
+
+
+class SourceIn(BaseModel):
+    name: str
+    type: str = "clouddrive2"
+    root: str = ""
+    base_url: str = ""
+    weight: int = 100
+
+
+class UserIn(BaseModel):
+    name: str
+    emby_user: str = ""
+    mode: str = "smart"
+    source_id: str | None = None
+
+
+class ResolveIn(BaseModel):
+    strm: str
+    user: str | None = None
+    mode: str | None = None
+    source_id: str | None = None
+
+
+class IngestIn(BaseModel):
+    text: str
+    source: str = "manual"
+
+
+class DiagnoseIn(BaseModel):
+    show: str
+    season: int = 1
+    total_episodes: int = 1
 
 
 def _run_scan() -> dict:
@@ -37,12 +90,21 @@ def _run_scan() -> dict:
             "result": result.__dict__,
             "at": started,
         }
+        logs_mod.append_log(settings, "scan", f"scanned={result.scanned} created={result.created} removed={result.removed}")
         return _last_scan
+
+
+def _user_mode(user_name: str | None, mode: str | None, source_id: str | None):
+    if user_name:
+        for u in users_mod.load_users(settings):
+            if u.name == user_name and u.enabled:
+                return u.mode if mode is None else mode, u.source_id if source_id is None else source_id
+    return mode or "smart", source_id
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.1.0"}
+    return {"ok": True, "version": "0.2.0"}
 
 
 @app.get("/")
@@ -59,6 +121,8 @@ def get_config():
         "strm_mode": settings.strm_mode,
         "strm_base_url": settings.strm_base_url,
         "scan_interval_minutes": settings.scan_interval_minutes,
+        "emby_upstream": settings.emby_upstream,
+        "cache_ttl_seconds": settings.cache_ttl_seconds,
         "source_exists": settings.source_root.exists(),
         "strm_exists": settings.strm_root.exists(),
     }
@@ -77,6 +141,8 @@ def update_config(body: ConfigIn):
         settings.strm_base_url = body.strm_base_url.strip().rstrip("/")
     if body.scan_interval_minutes is not None:
         settings.scan_interval_minutes = int(body.scan_interval_minutes)
+    if body.emby_upstream is not None:
+        settings.emby_upstream = body.emby_upstream.strip().rstrip("/")
     save_settings(settings)
     return get_config()
 
@@ -88,7 +154,130 @@ def trigger_scan():
 
 @app.get("/api/status")
 def status():
-    return {"config": get_config(), "last_scan": _last_scan}
+    return {"config": get_config(), "last_scan": _last_scan,
+            "sources": len(sources_mod.load_sources(settings)),
+            "users": len(users_mod.load_users(settings)),
+            "plugins": len(plugins_mod.list_plugins(PLUGINS_DIR))}
+
+
+# --- Sources ---
+@app.get("/api/sources")
+def list_sources():
+    return [s.__dict__ for s in sources_mod.load_sources(settings)]
+
+
+@app.post("/api/sources")
+def create_source(body: SourceIn):
+    src = sources_mod.add_source(settings, body.name, body.type, body.root, body.base_url, body.weight)
+    return src.__dict__
+
+
+@app.delete("/api/sources/{source_id}")
+def delete_source(source_id: str):
+    return {"deleted": sources_mod.remove_source(settings, source_id)}
+
+
+# --- Users ---
+@app.get("/api/users")
+def list_users():
+    return [u.__dict__ for u in users_mod.load_users(settings)]
+
+
+@app.post("/api/users")
+def create_user(body: UserIn):
+    user = users_mod.add_user(settings, body.name, body.emby_user, body.mode, body.source_id)
+    return user.__dict__
+
+
+# --- Diversion / play ---
+@app.post("/api/resolve")
+def resolve(body: ResolveIn):
+    mode, source_id = _user_mode(body.user, body.mode, body.source_id)
+    cached = cache_mod.get_cached(settings, body.strm)
+    if cached:
+        return {"ok": True, "mode": mode, "target": cached, "via": "cache", "cached": True}
+    result = diversion_mod.resolve(body.strm, sources_mod.load_sources(settings), mode, source_id, play_base="")
+    if result.get("ok"):
+        cache_mod.put_cache(settings, body.strm, result["target"])
+    return result
+
+
+@app.get("/play")
+def play(path: str, user: str | None = None):
+    # path is a file path or a URL stored in a STRM.
+    mode, source_id = _user_mode(user, None, None)
+    cached = cache_mod.get_cached(settings, path)
+    if cached:
+        target = cached
+    else:
+        result = diversion_mod.resolve(path, sources_mod.load_sources(settings), mode, source_id, play_base="")
+        if not result.get("ok"):
+            logs_mod.append_log(settings, "playback_error", result.get("error", "resolve failed"), path=path)
+            return JSONResponse(result, status_code=404)
+        target = result["target"]
+        cache_mod.put_cache(settings, path, target)
+    logs_mod.append_log(settings, "playback", target, path=path, user=user or "")
+    if target.startswith("http://") or target.startswith("https://"):
+        return RedirectResponse(target, status_code=302)
+    if Path(target).is_file():
+        return FileResponse(target)
+    # /play?path=<file> where resolve returned the file itself
+    if Path(path).is_file():
+        return FileResponse(path)
+    return JSONResponse({"ok": False, "error": "target not found", "target": target}, status_code=404)
+
+
+# --- Cache / logs ---
+@app.get("/api/cache")
+def list_cache():
+    return cache_mod.load_cache(settings)
+
+
+@app.post("/api/cache/clear")
+def clear_cache():
+    return {"cleared": cache_mod.clear_cache(settings)}
+
+
+@app.get("/api/logs")
+def list_logs(limit: int = 100):
+    return logs_mod.read_logs(settings, limit)
+
+
+# --- Discovery (NextFind) ---
+@app.post("/api/discovery/ingest")
+def ingest(body: IngestIn):
+    return discovery_mod.ingest(settings, body.text, body.source)
+
+
+@app.get("/api/discovery")
+def list_discovery():
+    return discovery_mod.load_items(settings)
+
+
+@app.post("/api/discovery/diagnose")
+def diagnose(body: DiagnoseIn):
+    return discovery_mod.diagnose(settings, body.show, body.season, body.total_episodes)
+
+
+# --- Plugins ---
+@app.get("/api/plugins")
+def list_plugins():
+    return plugins_mod.list_plugins(PLUGINS_DIR)
+
+
+@app.post("/api/plugins/{name}/run")
+def run_plugin(name: str, body: dict | None = None):
+    query = (body or {}).get("query", "")
+    return plugins_mod.run_plugin(PLUGINS_DIR, name, query, settings)
+
+
+# --- Emby gateway ---
+@app.get("/emby/{path:path}")
+def emby_proxy(path: str, request: Request):
+    if not settings.emby_upstream:
+        return JSONResponse({"ok": False, "error": "EMBY_UPSTREAM not configured"}, status_code=501)
+    status, body, ctype = gateway_mod.proxy_get(settings.emby_upstream, path, str(request.query_params))
+    return Response(content=body, status_code=status, media_type=ctype)
 
 
 async def _scheduler() -> None:
