@@ -33,7 +33,7 @@ from . import users as users_mod
 from .config import Settings, load_settings, save_settings
 from .scanner import ScanResult, scan
 
-app = FastAPI(title="CloudReel", version="0.3.3")
+app = FastAPI(title="CloudReel", version="0.4.0")
 settings: Settings = load_settings()
 _last_scan: dict = {"status": "never", "result": None, "at": None}
 _scan_lock = threading.Lock()
@@ -109,7 +109,7 @@ def _user_mode(user_name: str | None, mode: str | None, source_id: str | None):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.3.3"}
+    return {"ok": True, "version": "0.4.0"}
 
 
 @app.get("/")
@@ -159,10 +159,19 @@ def trigger_scan():
 
 @app.get("/api/status")
 def status():
+    strm_count = 0
+    try:
+        if settings.strm_root.exists():
+            strm_count = sum(1 for _ in settings.strm_root.rglob("*.strm"))
+    except Exception:
+        strm_count = 0
     return {"config": get_config(), "last_scan": _last_scan,
             "sources": len(sources_mod.load_sources(settings)),
             "users": len(users_mod.load_users(settings)),
-            "plugins": len(plugins_mod.list_plugins(PLUGINS_DIR))}
+            "plugins": len(plugins_mod.list_plugins(PLUGINS_DIR)),
+            "strm_count": strm_count,
+            "cache_count": len(cache_mod.load_cache(settings)),
+            "log_count": len(logs_mod.read_logs(settings, limit=500))}
 
 
 # --- Sources ---

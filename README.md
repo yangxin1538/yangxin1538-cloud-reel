@@ -19,6 +19,16 @@ CloudDrive2 挂载的网盘 (/CloudNAS)
 
 ## 功能
 
+### v0.4.0：新管理界面（蒸馏自 NextEmby / NextFind）
+
+在云服务器上实际跑了 NextEmby v4.8.2（管理端 8091）和 NextFind v3.8.2（8092），逐页看过之后重做的界面，不含原项目代码：
+
+- **左侧边栏 + 统计卡片**：学 NextEmby 的布局，左边是导航（仪表盘 / 扫描配置 / 网盘源 / 分流试算 / 发现诊断 / 用户管理 / 直链缓存 / 系统日志 / 插件 / 设置），顶部是统计卡片（网盘源、STRM 文件、用户、直链缓存、日志、插件），不再是原来一屏裸 JSON。
+- **学 NextFind 的配色**：浅色底、圆角白卡片、蓝色主按钮、橙色「立即扫描」CTA。
+- **缺集诊断可视化**：已找到的集和缺失的集用不同颜色的 chip 展示，不用再翻 JSON。
+- **网盘源 / 用户改成表格 + 表单**：列表、添加、删除都在页面上完成。
+- **状态接口补数**：`GET /api/status` 新增 `strm_count`、`cache_count`、`log_count`，供仪表盘用。
+
 ### v0.3.2：通用部署
 
 - **所有 NAS 和云服务器**：不再只认群晖。通用 `docker-compose.yml` 用变量配路径，默认相对路径，在群晖、QNAP、绿联、TrueNAS、Unraid、Linux 云服务器上都能跑；`deploy/docker-run.sh` 提供 `docker run` 装法；完整对照见 `docs/DEPLOY.md`。`docker-compose.synology.yml` 保留，只是群晖示例。

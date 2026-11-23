@@ -5,80 +5,300 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CloudReel</title>
 <style>
-body{font-family:system-ui,-apple-system,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;color:#222}
-input,select,textarea{width:100%;padding:8px;margin:4px 0 12px;box-sizing:border-box}
-button{padding:10px 18px;cursor:pointer;margin-right:8px}
-pre{background:#f4f4f4;padding:12px;white-space:pre-wrap;word-break:break-word}
-h2{margin-top:32px}
+:root{
+  --bg:#f3f5f9; --card:#ffffff; --border:#e5e7eb; --text:#1f2937; --muted:#6b7280;
+  --blue:#2563eb; --blue-d:#1d4ed8; --orange:#ea580c; --green:#16a34a; --red:#dc2626;
+  --sidebar:#ffffff; --radius:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text)}
+a{color:var(--blue);text-decoration:none}
+.layout{display:flex;min-height:100vh}
+/* 侧边栏：学 NextEmby，左栏导航 + 底部版本 */
+.sidebar{width:236px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:20px 18px 14px;font-size:19px;font-weight:800}
+.brand .mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--orange));color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px}
+.nav{padding:6px 12px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:10px;background:none;color:#374151;font-size:14px;cursor:pointer;text-align:left}
+.nav button:hover{background:#f3f4f6}
+.nav button.active{background:#dbeafe;color:var(--blue-d);font-weight:600}
+.nav .ic{width:20px;text-align:center;font-size:16px}
+.side-foot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;display:flex;justify-content:space-between}
+.main{flex:1;min-width:0;padding:22px 26px 40px}
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.topbar h1{font-size:20px;margin:0}
+.badge{font-size:12px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:var(--green);font-weight:600}
+.badge.bad{background:#fee2e2;color:var(--red)}
+.topbar .sp{flex:1}
+.btn{padding:9px 16px;border-radius:9px;border:1px solid var(--border);background:#fff;color:var(--text);font-size:14px;cursor:pointer}
+.btn:hover{background:#f9fafb}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{background:var(--blue-d)}
+.btn.orange{background:var(--orange);border-color:var(--orange);color:#fff}
+.btn.danger{color:var(--red)}
+.btn:disabled{opacity:.55;cursor:default}
+/* 统计卡片：学 NextEmby 控制台 */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+.stat .n{font-size:26px;font-weight:800}
+.stat .l{color:var(--muted);font-size:13px;margin-top:2px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.card h2{margin:0 0 4px;font-size:16px}
+.card .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label{display:block;font-size:13px;color:#374151;margin-bottom:12px}
+label span{display:block;margin-bottom:4px;color:var(--muted)}
+input,select,textarea{width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:9px;font-size:14px;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:2px solid #bfdbfe;border-color:var(--blue)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;background:#e0e7ff;color:#3730a3;margin:2px 2px 2px 0}
+.chip.miss{background:#fee2e2;color:#991b1b}
+.chip.ok{background:#dcfce7;color:#166534}
+.muted{color:var(--muted);font-size:13px}
+pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;white-space:pre-wrap;word-break:break-word;font-size:13px;max-height:420px;overflow:auto}
+.page{display:none}
+.page.active{display:block}
+@media (max-width:860px){.sidebar{width:64px}.brand span,.nav button span.tx,.side-foot{display:none}.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<h1>CloudReel v0.2</h1>
-<p>CD2 网盘 → STRM → Emby / Jellyfin，带 NextEmby 分流网关与 NextFind 发现诊断。</p>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">▶</div><span>CloudReel</span></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot"><span id="ver">v…</span><span id="health">●</span></div>
+  </aside>
+  <main class="main">
+    <div class="topbar"><h1 id="pageTitle">仪表盘</h1><span class="badge" id="healthBadge">运行中</span><div class="sp"></div><button class="btn orange" onclick="doScan()">▶ 立即扫描</button></div>
 
-<h2>配置与扫描</h2>
-<label>源目录（CD2 挂载）<input id="source_root"></label>
-<label>STRM 输出目录<input id="strm_root"></label>
-<label>Emby 上游（网关用，如 http://127.0.0.1:8096）<input id="emby_upstream" placeholder="留空表示不启用网关"></label>
-<label>定时扫描（分钟，0=关闭）<input id="scan_interval_minutes" type="number"></label>
-<button onclick="save()">保存配置</button>
-<button onclick="doScan()">立即扫描</button>
+    <section class="page active" id="page-dashboard">
+      <div class="stats" id="stats"></div>
+      <div class="grid2">
+        <div class="card"><h2>上次扫描</h2><p class="sub">定时扫描默认每 60 分钟一次</p><div id="lastScan" class="muted">暂无扫描记录</div></div>
+        <div class="card"><h2>快速入口</h2><p class="sub">常用操作，一点就到</p>
+          <div class="row">
+            <button class="btn" onclick="go('sources')">网盘源</button>
+            <button class="btn" onclick="go('resolve')">分流试算</button>
+            <button class="btn" onclick="go('discovery')">发现诊断</button>
+            <button class="btn" onclick="go('users')">用户管理</button>
+          </div>
+          <p class="muted" style="margin-top:14px">Emby 里新建媒体库，指向 STRM 输出目录下的 Movies / TV，就能直接播云盘里的片。</p>
+        </div>
+      </div>
+      <div class="card"><h2>123 直连状态</h2><p class="sub">会员默认开通；没配凭证时直连会回落到直链 / 本地文件</p><div id="pan123" class="muted">加载中…</div></div>
+    </section>
 
-<h2>分流试算</h2>
-<label>STRM 内容（文件路径或直链）<input id="strm" placeholder="/CloudNAS/电影/片名 (2024).mkv"></label>
-<label>用户<input id="user" placeholder="admin"></label>
-<label>模式
-<select id="mode"><option value="smart">smart 智能分流</option><option value="designated">designated 指定网盘</option><option value="direct115">direct115 115直连</option><option value="direct123">direct123 123直连</option><option value="directguangya">directguangya 光鸭直连</option><option value="redirect302">redirect302 302跳转</option></select>
-</label>
-<button onclick="resolve()">试算分流</button>
-<p><a id="playlink" href="#" target="_blank">播放链接（试算后生成）</a></p>
+    <section class="page" id="page-scan">
+      <div class="card"><h2>扫描配置</h2><p class="sub">源目录一般是 CloudDrive2 挂载的 CloudNAS；STRM 输出目录给 Emby 扫库用</p>
+        <label><span>源目录（CD2 挂载）</span><input id="source_root"></label>
+        <label><span>STRM 输出目录</span><input id="strm_root"></label>
+        <div class="grid2">
+          <label><span>STRM 模式</span><select id="strm_mode"><option value="file">file 本地路径</option><option value="url">url 直链拼接</option></select></label>
+          <label><span>STRM 直链前缀（url 模式用）</span><input id="strm_base_url" placeholder="https://…"></label>
+        </div>
+        <div class="grid2">
+          <label><span>定时扫描（分钟，0=关闭）</span><input id="scan_interval_minutes" type="number"></label>
+          <label><span>Emby 上游（网关用，如 http://127.0.0.1:8096）</span><input id="emby_upstream" placeholder="留空表示不启用网关"></label>
+        </div>
+        <div class="row"><button class="btn primary" onclick="save()">保存配置</button><button class="btn orange" onclick="doScan()">▶ 立即扫描</button></div>
+      </div>
+      <div class="card"><h2>扫描结果</h2><pre id="scanResult">还没有扫描过</pre></div>
+    </section>
 
-<h2>发现（NextFind）</h2>
-<textarea id="ingest_text" rows="4" placeholder="粘贴频道/分享链接文本，每行一条"></textarea>
-<button onclick="ingest()">导入发现</button>
-<label>剧名<input id="show" placeholder="三体"></label>
-<label>季<input id="season" type="number" value="1"></label>
-<label>总集数<input id="total" type="number" value="10"></label>
-<button onclick="diagnose()">缺集诊断</button>
+    <section class="page" id="page-sources">
+      <div class="card"><h2>网盘源</h2><p class="sub">支持 CloudDrive2、115、123、光鸭、本地、远程；123 用真实开放平台 API，光鸭默认会员直连</p>
+        <table><thead><tr><th>名称</th><th>类型</th><th>根路径 / 直链</th><th>权重</th><th>操作</th></tr></thead><tbody id="srcTable"></tbody></table>
+      </div>
+      <div class="card"><h2>添加网盘源</h2>
+        <div class="grid2">
+          <label><span>名称</span><input id="ns_name" placeholder="我的 123"></label>
+          <label><span>类型</span><select id="ns_type"><option value="clouddrive2">clouddrive2</option><option value="123">123</option><option value="guangya">guangya 光鸭</option><option value="115">115</option><option value="local">local 本地</option><option value="remote">remote 远程</option></select></label>
+        </div>
+        <div class="grid2">
+          <label><span>根路径</span><input id="ns_root" placeholder="/CloudNAS"></label>
+          <label><span>直链前缀 base_url</span><input id="ns_base" placeholder="https://…"></label>
+        </div>
+        <label><span>123 client_id / 光鸭 Bearer（可选，密钥不在此回显）</span><input id="ns_token" placeholder="留空表示不填"></label>
+        <button class="btn primary" onclick="addSource()">添加网盘源</button>
+      </div>
+    </section>
 
-<h2>状态</h2>
-<pre id="status">加载中…</pre>
-<p>
-<button onclick="show('sources')">源</button>
-<button onclick="show('users')">用户</button>
-<button onclick="show('cache')">缓存</button>
-<button onclick="show('logs')">日志</button>
-<button onclick="show('plugins')">插件</button>
-<button onclick="show('discovery')">发现</button>
-<button onclick="clearCache()">清空缓存</button>
-</p>
-<pre id="detail"></pre>
+    <section class="page" id="page-resolve">
+      <div class="card"><h2>分流试算</h2><p class="sub">模拟一次播放请求，看 CloudReel 会把它分流到哪里；和 NextEmby 的分流网关一个思路</p>
+        <label><span>STRM 内容（文件路径或直链）</span><input id="strm" placeholder="/CloudNAS/电影/片名 (2024).mkv"></label>
+        <div class="grid2">
+          <label><span>用户</span><input id="user" placeholder="admin"></label>
+          <label><span>模式</span><select id="mode"><option value="smart">smart 智能分流</option><option value="designated">designated 指定网盘</option><option value="direct115">direct115 115直连</option><option value="direct123">direct123 123直连</option><option value="directguangya">directguangya 光鸭直连</option><option value="redirect302">redirect302 302跳转</option></select></label>
+        </div>
+        <div class="row"><button class="btn primary" onclick="resolve()">试算分流</button><a id="playlink" class="btn" href="#" target="_blank">打开播放链接</a></div>
+      </div>
+      <div class="card"><h2>试算结果</h2><pre id="resolveResult">还没有试算过</pre></div>
+    </section>
 
+    <section class="page" id="page-discovery">
+      <div class="card"><h2>发现导入</h2><p class="sub">粘贴频道 / 分享链接文本，CloudReel 会解析出剧名、季、集和链接；和 NextFind 的手动导入一个思路</p>
+        <label><span>频道 / 分享文本，每行一条</span><textarea id="ingest_text" rows="4" placeholder="三体 S01E01 https://…"></textarea></label>
+        <button class="btn primary" onclick="ingest()">导入发现</button>
+      </div>
+      <div class="card"><h2>缺集诊断</h2><p class="sub">拿期望集数和库里的 STRM 对比，缺哪集一目了然</p>
+        <div class="grid2">
+          <label><span>剧名</span><input id="show" placeholder="三体"></label>
+          <label><span>季</span><input id="season" type="number" value="1"></label>
+        </div>
+        <label><span>总集数</span><input id="total" type="number" value="10"></label>
+        <button class="btn primary" onclick="diagnose()">开始诊断</button>
+        <div id="diagResult" style="margin-top:14px"></div>
+      </div>
+      <div class="card"><h2>已导入的发现</h2><pre id="discList">加载中…</pre></div>
+    </section>
+
+    <section class="page" id="page-users">
+      <div class="card"><h2>用户管理</h2><p class="sub">把 Emby 用户绑到分流模式和指定网盘上，每个人可以走不同的线路</p>
+        <table><thead><tr><th>用户</th><th>Emby 用户</th><th>分流模式</th><th>指定网盘</th></tr></thead><tbody id="userTable"></tbody></table>
+      </div>
+      <div class="card"><h2>添加用户</h2>
+        <div class="grid2">
+          <label><span>用户名</span><input id="nu_name" placeholder="admin"></label>
+          <label><span>Emby 用户名</span><input id="nu_emby" placeholder="admin"></label>
+        </div>
+        <label><span>分流模式</span><select id="nu_mode"><option value="smart">smart</option><option value="designated">designated</option><option value="direct115">direct115</option><option value="direct123">direct123</option><option value="directguangya">directguangya</option><option value="redirect302">redirect302</option></select></label>
+        <button class="btn primary" onclick="addUser()">添加用户</button>
+      </div>
+    </section>
+
+    <section class="page" id="page-cache">
+      <div class="card"><h2>直链缓存</h2><p class="sub">直链解析一次就缓存起来，默认 1 小时有效；和 NextEmby 的缓存列表一个思路</p>
+        <div class="row" style="margin-bottom:12px"><button class="btn" onclick="loadCache()">刷新</button><button class="btn danger" onclick="clearCache()">清空缓存</button></div>
+        <pre id="cacheList">加载中…</pre>
+      </div>
+    </section>
+
+    <section class="page" id="page-logs">
+      <div class="card"><h2>系统日志</h2><p class="sub">扫描、播放、分流都在这里，最多保留 500 条</p>
+        <div class="row" style="margin-bottom:12px"><button class="btn" onclick="loadLogs()">刷新</button></div>
+        <pre id="logList">加载中…</pre>
+      </div>
+    </section>
+
+    <section class="page" id="page-plugins">
+      <div class="card"><h2>插件</h2><p class="sub">plugins/ 下的插件会自动发现；点运行可以手动触发一次</p>
+        <div id="pluginList" class="muted">加载中…</div>
+      </div>
+    </section>
+
+    <section class="page" id="page-settings">
+      <div class="card"><h2>设置</h2><p class="sub">扫描配置在「扫描配置」页；这里是网盘凭证状态</p>
+        <div id="settings123" class="muted">加载中…</div>
+        <p class="muted">123 开放平台凭证（PAN123_CLIENT_ID / PAN123_CLIENT_SECRET）请写在部署目录的 .env 里再重启，不要贴在聊天里。光鸭不需要官方接口，配好直链入口或 Bearer 就能用。</p>
+      </div>
+    </section>
+  </main>
+</div>
 <script>
+const PAGES=[
+ ["dashboard","📊","仪表盘"],["scan","🔍","扫描配置"],["sources","💾","网盘源"],
+ ["resolve","🔀","分流试算"],["discovery","🎬","发现诊断"],["users","👤","用户管理"],
+ ["cache","⚡","直链缓存"],["logs","📋","系统日志"],["plugins","🧩","插件"],["settings","⚙️","设置"]];
+const nav=document.getElementById('nav');
+PAGES.forEach(([id,ic,tx])=>{
+  const b=document.createElement('button');
+  b.innerHTML=`<span class="ic">${ic}</span><span class="tx">${tx}</span>`;
+  b.onclick=()=>go(id); b.dataset.page=id; nav.appendChild(b);
+});
+function go(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
+  document.getElementById('pageTitle').textContent=PAGES.find(p=>p[0]===id)[2];
+  if(id==='sources')loadSources(); if(id==='users')loadUsers(); if(id==='cache')loadCache();
+  if(id==='logs')loadLogs(); if(id==='plugins')loadPlugins(); if(id==='discovery')loadDisc();
+  if(id==='settings')load123();
+}
 async function j(u,o){const r=await fetch(u,o);return r.json();}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 async function load(){
+  const h=await j('/health'); document.getElementById('ver').textContent='v'+h.version;
   const s=await j('/api/status'); const c=s.config;
-  source_root.value=c.source_root; strm_root.value=c.strm_root;
-  emby_upstream.value=c.emby_upstream||''; scan_interval_minutes.value=c.scan_interval_minutes;
-  status.textContent=JSON.stringify(s,null,2);
+  source_root.value=c.source_root; strm_root.value=c.strm_root; strm_mode.value=c.strm_mode||'file';
+  strm_base_url.value=c.strm_base_url||''; scan_interval_minutes.value=c.scan_interval_minutes;
+  emby_upstream.value=c.emby_upstream||'';
+  document.getElementById('stats').innerHTML=[
+    ['网盘源',s.sources],['STRM 文件',s.strm_count],['用户',s.users],
+    ['直链缓存',s.cache_count],['日志',s.log_count],['插件',s.plugins]
+  ].map(([l,n])=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+  const ls=s.last_scan;
+  document.getElementById('lastScan').innerHTML=ls&&ls.at
+    ? `上次：${esc(ls.at)}，状态 ${esc(ls.status||'')}<br>扫描 ${ls.result?.scanned??'—'} 个，新增 ${ls.result?.created??'—'} 个，清理 ${ls.result?.removed??'—'} 个`
+    : '暂无扫描记录';
+  load123();
+}
+async function load123(){
+  const d=await j('/api/drives/123/status');
+  const html=`凭证：${d.configured?'已配置':'未配置'} · 会员默认开通：${d.membership_assumed?'是':'否'}<br><span class="muted">接口：${esc(d.base_url||'https://open-api.123pan.com')}</span>`;
+  document.getElementById('pan123').innerHTML=html;
+  const el=document.getElementById('settings123'); if(el) el.innerHTML=html;
 }
 async function save(){
   await j('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({source_root:source_root.value,strm_root:strm_root.value,
-      emby_upstream:emby_upstream.value,scan_interval_minutes:Number(scan_interval_minutes.value)})});
+    body:JSON.stringify({source_root:source_root.value,strm_root:strm_root.value,strm_mode:strm_mode.value,
+      strm_base_url:strm_base_url.value,scan_interval_minutes:Number(scan_interval_minutes.value),
+      emby_upstream:emby_upstream.value})});
   load();
 }
-async function doScan(){status.textContent='扫描中…';status.textContent=JSON.stringify(await j('/api/scan',{method:'POST'}),null,2);load();}
+async function doScan(){
+  document.getElementById('scanResult').textContent='扫描中…';
+  const r=await j('/api/scan',{method:'POST'});
+  document.getElementById('scanResult').textContent=JSON.stringify(r,null,2); load();
+}
+async function loadSources(){
+  const list=await j('/api/sources');
+  document.getElementById('srcTable').innerHTML=list.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.type)}</td><td>${esc(s.root||s.base_url||'')}</td><td>${esc(s.weight)}</td><td><button class="btn danger" onclick="delSource('${esc(s.id)}')">删除</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">暂无网盘源</td></tr>';
+}
+async function addSource(){
+  await j('/api/sources',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:ns_name.value,type:ns_type.value,root:ns_root.value,base_url:ns_base.value,auth_token:ns_token.value})});
+  loadSources(); load();
+}
+async function delSource(id){await fetch('/api/sources/'+encodeURIComponent(id),{method:'DELETE'});loadSources();load();}
 async function resolve(){
   const r=await j('/api/resolve',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({strm:strm.value,user:user.value||null,mode:mode.value})});
-  detail.textContent=JSON.stringify(r,null,2);
+  document.getElementById('resolveResult').textContent=JSON.stringify(r,null,2);
   if(r.ok) playlink.href='/play?path='+encodeURIComponent(strm.value)+(user.value?'&user='+encodeURIComponent(user.value):'');
 }
-async function ingest(){detail.textContent=JSON.stringify(await j('/api/discovery/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:ingest_text.value})}),null,2);}
-async function diagnose(){detail.textContent=JSON.stringify(await j('/api/discovery/diagnose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({show:show.value,season:Number(season.value),total_episodes:Number(total.value)})}),null,2);}
-async function show(k){detail.textContent=JSON.stringify(await j('/api/'+k),null,2);}
-async function clearCache(){detail.textContent=JSON.stringify(await j('/api/cache/clear',{method:'POST'}),null,2);}
+async function ingest(){
+  const r=await j('/api/discovery/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:ingest_text.value})});
+  document.getElementById('discList').textContent=JSON.stringify(r,null,2); loadDisc();
+}
+async function loadDisc(){document.getElementById('discList').textContent=JSON.stringify(await j('/api/discovery'),null,2);}
+async function diagnose(){
+  const r=await j('/api/discovery/diagnose',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({show:show.value,season:Number(season.value),total_episodes:Number(total.value)})});
+  const chips=(arr,cls)=>arr.map(n=>`<span class="chip ${cls}">${n}</span>`).join('');
+  document.getElementById('diagResult').innerHTML=r.ok||r.present
+    ? `<p>已找到：${chips(r.present||[],'ok')}</p><p>缺失：${(r.missing||[]).length?chips(r.missing,'miss'):'无，全部齐全'}</p><pre>${esc(JSON.stringify(r,null,2))}</pre>`
+    : `<pre>${esc(JSON.stringify(r,null,2))}</pre>`;
+}
+async function loadUsers(){
+  const list=await j('/api/users');
+  document.getElementById('userTable').innerHTML=list.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.emby_user||'')}</td><td>${esc(u.mode||'')}</td><td>${esc(u.source_id||'')}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">暂无用户</td></tr>';
+}
+async function addUser(){
+  await j('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:nu_name.value,emby_user:nu_emby.value,mode:nu_mode.value})});
+  loadUsers(); load();
+}
+async function loadCache(){document.getElementById('cacheList').textContent=JSON.stringify(await j('/api/cache'),null,2);}
+async function clearCache(){document.getElementById('cacheList').textContent=JSON.stringify(await j('/api/cache/clear',{method:'POST'}),null,2);load();}
+async function loadLogs(){document.getElementById('logList').textContent=JSON.stringify(await j('/api/logs'),null,2);}
+async function loadPlugins(){
+  const list=await j('/api/plugins');
+  document.getElementById('pluginList').innerHTML=list.map(p=>`<div class="card" style="margin-bottom:10px"><b>${esc(p.name)}</b><p class="muted">${esc(p.description||'')}</p><button class="btn" onclick="runPlugin('${esc(p.name)}')">运行</button></div>`).join('')||'暂无插件';
+}
+async function runPlugin(n){alert(JSON.stringify(await j('/api/plugins/'+encodeURIComponent(n)+'/run',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}),null,2));}
 load();
 </script>
 </body>
