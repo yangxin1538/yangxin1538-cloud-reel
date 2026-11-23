@@ -1,0 +1,21 @@
+services:
+  cloud-reel:
+    build: .
+    image: cloud-reel:latest
+    container_name: cloud-reel
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PORT: "8088"
+      PUID: "0"
+      PGID: "0"
+      SOURCE_ROOT: "/CloudNAS"
+      STRM_ROOT: "/strm/CloudReel"
+      STRM_MODE: "file"
+      SCAN_INTERVAL_MINUTES: "60"
+    volumes:
+      - "./data:/app/data"
+      - "./config:/app/config"
+      - "./strm:/strm:ro"
+      - "./strm/CloudReel:/strm/CloudReel"
+      - "./CloudNAS:/CloudNAS:ro,rslave"

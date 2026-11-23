@@ -1,0 +1,24 @@
+# 群晖部署示例：按你的实际盘符改路径
+# CloudDrive2 已把网盘挂到 /volume1/docker/clouddrive2/CloudNAS
+# STRM 输出在 /volume2/存储盘2/strm/media/CloudReel
+services:
+  cloud-reel:
+    build: .
+    image: cloud-reel:latest
+    container_name: cloud-reel
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PORT: "8088"
+      PUID: "0"
+      PGID: "0"
+      SOURCE_ROOT: "/CloudNAS"
+      STRM_ROOT: "/strm/CloudReel"
+      STRM_MODE: "file"
+      SCAN_INTERVAL_MINUTES: "60"
+    volumes:
+      - "/volume1/docker/cloud-reel/data:/app/data"
+      - "/volume1/docker/cloud-reel/config:/app/config"
+      - "/volume2/存储盘2/strm/media:/strm:ro"
+      - "/volume2/存储盘2/strm/media/CloudReel:/strm/CloudReel"
+      - "/volume1/docker/clouddrive2/CloudNAS:/CloudNAS:ro,rslave"
