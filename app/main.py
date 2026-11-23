@@ -33,7 +33,7 @@ from . import users as users_mod
 from .config import Settings, load_settings, save_settings
 from .scanner import ScanResult, scan
 
-app = FastAPI(title="CloudReel", version="0.3.2")
+app = FastAPI(title="CloudReel", version="0.3.3")
 settings: Settings = load_settings()
 _last_scan: dict = {"status": "never", "result": None, "at": None}
 _scan_lock = threading.Lock()
@@ -109,7 +109,7 @@ def _user_mode(user_name: str | None, mode: str | None, source_id: str | None):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.3.2"}
+    return {"ok": True, "version": "0.3.3"}
 
 
 @app.get("/")
