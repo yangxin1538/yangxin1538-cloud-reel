@@ -25,6 +25,12 @@ CloudDrive2 挂载的网盘 (/CloudNAS)
 
 - **多源注册（NextEmby 服务器配置）**：`GET/POST /api/sources`，源类型有 `clouddrive2`、`115`、`123`、`guangya`（光鸭）、`local`、`remote`，带权重和启用开关，默认源就是 CD2 的 `/CloudNAS`。
 
+### v0.3.1：123 真 API + 所有网盘默认会员
+
+- **默认会员**：所有网盘都默认有会员，代码里不再做会员 / 流量 gating，不再问你是不是会员。
+- **123 真 API**：`app/pan123.py`，开放平台 `https://open-api.123pan.com`，`POST /api/v1/access_token`（`clientID` / `clientSecret`，头 `Platform: open_platform`）→ `GET /api/v2/file/list` 按路径找 `fileId` → `POST /api/v1/direct-link/enable`（文件夹级）→ `GET /api/v1/direct-link/url?fileID=` 取真直链，走现有 `direct123` 返回 302。token 缓存在 `data/pan123_token.json`，不进 git。凭证来自环境变量 `PAN123_CLIENT_ID` / `PAN123_CLIENT_SECRET`，或源的 `client_id` / `client_secret` 字段；没配凭证时自动回落到 `base_url` / 文件。状态看 `GET /api/drives/123/status`。
+- **光鸭**：会员已默认有，`app/guangya.py` 不再卡会员 / 流量。没找到稳定的公开官方接口，所以不编造 endpoint：配了直链入口 `base_url` + Bearer `auth_token`（登录会话里捕获，或扫码登录拿到的 token）就走 302，没配就走 CD2 / 本地挂载。
+
 ### v0.3：123 网盘 + 光鸭云盘
 
 - **123 网盘**：源类型 `123`，分流模式 `direct123`。123 有开放平台，流程是 `RequestAccessToken(client_id, client_secret)` → `EnableDirectLink(fileId)` → `GetDirectLinkUrl(fileId)`。大文件（>100MB）通常要登录后的 Authorization，否则会报 5112 / 请登录后下载。CloudReel 里配 `base_url`（直链入口）和 `auth_token` 就能走 302，没配就走 CD2 / 本地挂载读文件。

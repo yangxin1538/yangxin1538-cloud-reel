@@ -1,0 +1,17 @@
+[
+  "tests/test_discovery.py::test_ingest_and_diagnose",
+  "tests/test_diversion.py::test_direct115_requires_115",
+  "tests/test_diversion.py::test_smart_picks_cd2",
+  "tests/test_diversion.py::test_url_passthrough",
+  "tests/test_drives.py::test_123_direct_url_with_base",
+  "tests/test_drives.py::test_123_needs_base_url",
+  "tests/test_drives.py::test_detect_123_share",
+  "tests/test_drives.py::test_direct123_mode",
+  "tests/test_drives.py::test_directguangya_requires_source",
+  "tests/test_drives.py::test_guangya_needs_base_url",
+  "tests/test_pan123.py::test_guangya_direct_url",
+  "tests/test_pan123.py::test_guangya_member_assumed_no_base_url",
+  "tests/test_pan123.py::test_pan123_direct_link_for_path",
+  "tests/test_parser.py::test_movie",
+  "tests/test_parser.py::test_tv"
+]

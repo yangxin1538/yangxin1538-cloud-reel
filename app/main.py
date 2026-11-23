@@ -1,4 +1,4 @@
-"""CloudReel v0.2 web service.
+"""CloudReel v0.3.1 web service.
 
 v0.1: scan CD2, generate STRM, clean up, Web config, scheduled scan.
 v0.2, NextEmby + NextFind integration:
@@ -23,6 +23,8 @@ from pydantic import BaseModel
 from . import cache as cache_mod
 from . import discovery as discovery_mod
 from . import diversion as diversion_mod
+from . import guangya as guangya_mod
+from .pan123 import Pan123Client, Pan123Error
 from . import gateway as gateway_mod
 from . import logs as logs_mod
 from . import plugins as plugins_mod
@@ -31,7 +33,7 @@ from . import users as users_mod
 from .config import Settings, load_settings, save_settings
 from .scanner import ScanResult, scan
 
-app = FastAPI(title="CloudReel", version="0.3.0")
+app = FastAPI(title="CloudReel", version="0.3.1")
 settings: Settings = load_settings()
 _last_scan: dict = {"status": "never", "result": None, "at": None}
 _scan_lock = threading.Lock()
@@ -54,6 +56,8 @@ class SourceIn(BaseModel):
     base_url: str = ""
     weight: int = 100
     auth_token: str = ""
+    client_id: str = ""
+    client_secret: str = ""
 
 
 class UserIn(BaseModel):
@@ -105,7 +109,7 @@ def _user_mode(user_name: str | None, mode: str | None, source_id: str | None):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.3.0"}
+    return {"ok": True, "version": "0.3.1"}
 
 
 @app.get("/")
@@ -162,22 +166,22 @@ def status():
 
 
 # --- Sources ---
+def _mask_source(s):
+    d = s.__dict__.copy()
+    d["auth_token"] = "***" if d.get("auth_token") else ""
+    d["client_secret"] = "***" if d.get("client_secret") else ""
+    return d
+
+
 @app.get("/api/sources")
 def list_sources():
-    out = []
-    for s in sources_mod.load_sources(settings):
-        d = s.__dict__.copy()
-        d["auth_token"] = "***" if d.get("auth_token") else ""
-        out.append(d)
-    return out
+    return [_mask_source(s) for s in sources_mod.load_sources(settings)]
 
 
 @app.post("/api/sources")
 def create_source(body: SourceIn):
-    src = sources_mod.add_source(settings, body.name, body.type, body.root, body.base_url, body.weight, body.auth_token)
-    out = src.__dict__.copy()
-    out["auth_token"] = "***" if out.get("auth_token") else ""
-    return out
+    src = sources_mod.add_source(settings, body.name, body.type, body.root, body.base_url, body.weight, body.auth_token, body.client_id, body.client_secret)
+    return _mask_source(src)
 
 
 @app.delete("/api/sources/{source_id}")
@@ -198,13 +202,72 @@ def create_user(body: UserIn):
 
 
 # --- Diversion / play ---
+def _pan123_client(source):
+    cid = source.client_id or settings.pan123_client_id
+    csec = source.client_secret or settings.pan123_client_secret
+    if not cid or not csec:
+        return None
+    return Pan123Client(cid, csec, data_dir=settings.data_dir)
+
+
+def _resolve_123(strm: str, sources) -> dict | None:
+    """Try the real 123 open-platform API. Returns None to fall back."""
+    src = next((s for s in sources if s.type == "123" and s.enabled), None)
+    if src is None:
+        return {"ok": False, "error": "no enabled 123 source"}
+    client = _pan123_client(src)
+    if client is None:
+        return None  # no credentials: fall back to base_url / file
+    try:
+        rel = str(Path(strm).relative_to(src.root)) if src.root and strm.startswith(src.root.rstrip("/")) else Path(strm).name
+        url = client.direct_link_for_path(rel)
+        return {"ok": True, "mode": "direct123", "source": src.id, "target": url, "via": "302", "api": "123-open-platform"}
+    except Pan123Error as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        return {"ok": False, "error": f"123 API error: {e}"}
+
+
+@app.get("/api/drives/123/status")
+def pan123_status():
+    sources = sources_mod.load_sources(settings)
+    src = next((s for s in sources if s.type == "123" and s.enabled), None)
+    return {
+        "configured": src is not None,
+        "credentials": bool(src and (src.client_id or settings.pan123_client_id) and (src.client_secret or settings.pan123_client_secret)),
+        "membership_assumed": True,
+        "base_url": "https://open-api.123pan.com",
+    }
+
+
 @app.post("/api/resolve")
 def resolve(body: ResolveIn):
     mode, source_id = _user_mode(body.user, body.mode, body.source_id)
     cached = cache_mod.get_cached(settings, body.strm)
     if cached:
         return {"ok": True, "mode": mode, "target": cached, "via": "cache", "cached": True}
-    result = diversion_mod.resolve(body.strm, sources_mod.load_sources(settings), mode, source_id, play_base="")
+    sources = sources_mod.load_sources(settings)
+    if mode == "direct123":
+        real = _resolve_123(body.strm, sources)
+        if real is not None:
+            if real.get("ok"):
+                cache_mod.put_cache(settings, body.strm, real["target"])
+            return real
+    if mode == "directguangya":
+        src = next((s for s in sources if s.type == "guangya" and s.enabled), None)
+        if src is None:
+            return {"ok": False, "error": "no enabled guangya source"}
+        if src.root and Path(body.strm).is_file():
+            return {"ok": True, "mode": mode, "source": src.id, "target": body.strm, "via": "file"}
+        r = guangya_mod.direct_url(src.base_url, src.root, body.strm)
+        if r.get("ok"):
+            out = {"ok": True, "mode": mode, "source": src.id, "target": r["target"], "via": "302"}
+            if src.auth_token:
+                out["auth_hint"] = "Bearer token required by player"
+            cache_mod.put_cache(settings, body.strm, r["target"])
+            return out
+        return {"ok": False, "error": r["error"]}
+    result = diversion_mod.resolve(body.strm, sources, mode, source_id, play_base="")
     if result.get("ok"):
         cache_mod.put_cache(settings, body.strm, result["target"])
     return result

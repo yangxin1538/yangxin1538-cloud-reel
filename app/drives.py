@@ -48,7 +48,7 @@ def build_direct_url(source_type: str, base_url: str, root: str, content: str) -
         if source_type == "guangya":
             return {
                 "ok": False,
-                "error": "光鸭 source needs base_url or a CD2/local root. 光鸭 direct links are temporary and need a Bearer Authorization from a logged-in web session.",
+                "error": "光鸭 source needs base_url or a CD2/local root. Membership is assumed; direct links are temporary and need a Bearer Authorization from a logged-in web session.",
             }
         return {"ok": False, "error": f"{source_type} source needs base_url"}
     try:

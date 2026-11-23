@@ -19,6 +19,8 @@ class Settings:
     config_dir: Path = Path("/app/config")
     emby_upstream: str = ""
     cache_ttl_seconds: int = 3600
+    pan123_client_id: str = ""
+    pan123_client_secret: str = ""
 
     @property
     def state_path(self) -> Path:
@@ -51,6 +53,10 @@ def _from_env() -> dict:
         out["emby_upstream"] = os.environ["EMBY_UPSTREAM"].strip().rstrip("/")
     if os.getenv("CACHE_TTL_SECONDS"):
         out["cache_ttl_seconds"] = int(os.environ["CACHE_TTL_SECONDS"])
+    if os.getenv("PAN123_CLIENT_ID") is not None:
+        out["pan123_client_id"] = os.environ["PAN123_CLIENT_ID"].strip()
+    if os.getenv("PAN123_CLIENT_SECRET") is not None:
+        out["pan123_client_secret"] = os.environ["PAN123_CLIENT_SECRET"].strip()
     return out
 
 

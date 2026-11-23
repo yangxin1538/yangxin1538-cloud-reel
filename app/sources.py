@@ -33,6 +33,8 @@ class Source:
     weight: int = 100
     enabled: bool = True
     auth_token: str = ""
+    client_id: str = ""
+    client_secret: str = ""
 
 
 def _path(settings: Settings) -> Path:
@@ -67,9 +69,9 @@ def save_sources(settings: Settings, sources: list[Source]) -> None:
     )
 
 
-def add_source(settings: Settings, name: str, type_: str, root: str = "", base_url: str = "", weight: int = 100, auth_token: str = "") -> Source:
+def add_source(settings: Settings, name: str, type_: str, root: str = "", base_url: str = "", weight: int = 100, auth_token: str = "", client_id: str = "", client_secret: str = "") -> Source:
     sources = load_sources(settings)
-    src = Source(id=uuid.uuid4().hex[:8], name=name, type=type_, root=root, base_url=base_url.rstrip("/"), weight=weight, auth_token=auth_token)
+    src = Source(id=uuid.uuid4().hex[:8], name=name, type=type_, root=root, base_url=base_url.rstrip("/"), weight=weight, auth_token=auth_token, client_id=client_id, client_secret=client_secret)
     sources.append(src)
     save_sources(settings, sources)
     return src
